@@ -9,8 +9,7 @@ import org.apache.http.util.EntityUtils;
 import org.springframework.stereotype.Service;
 
 import javax.mail.*;
-import javax.mail.event.MessageCountAdapter;
-import javax.mail.event.MessageCountEvent;
+import javax.mail.event.*;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
 import java.security.Security;
@@ -24,7 +23,9 @@ import java.util.*;
 @Service("mailtophoneservice")
 public class MailToPhoneServiceImpl implements MailToPhoneService {
 
-    private String subject;
+    private Date date = new Date();
+
+    private long timeSpace = 30 * 1000L;
 
     @Override
     public void resceiveMailToPhoneVoice() {
@@ -36,9 +37,7 @@ public class MailToPhoneServiceImpl implements MailToPhoneService {
         int port = 993;
 
 
-        boolean isOpenidle = true;
-        // 睡眠时间
-        String freqs = "5000";
+
 
         final String SSL_FACTORY = "javax.net.ssl.SSLSocketFactory";
         Security.addProvider(new com.sun.net.ssl.internal.ssl.Provider());
@@ -74,10 +73,11 @@ public class MailToPhoneServiceImpl implements MailToPhoneService {
             // 使用只读方式打开收件箱
             folder.open(Folder.READ_ONLY);
             System.out.println("##################开始监听新邮件###################");
-            folder.addMessageCountListener(new MessageCountAdapter() {
+            // 监听message变化
+            folder.addMessageCountListener(new MessageCountListener() {
                 @Override
-                public void messagesAdded(MessageCountEvent ev) {
-                    Message[] msgs = ev.getMessages();
+                public void messagesAdded(MessageCountEvent e) {
+                    Message[] msgs = e.getMessages();
                     System.out.println("Get " + msgs.length + " new messages");
 
                     // Just dump out the new messages
@@ -87,22 +87,19 @@ public class MailToPhoneServiceImpl implements MailToPhoneService {
                             System.out.println("总邮件数 " + msgs[i].getMessageNumber() + ":");
                             System.out.println("发现新邮件，主题:");
                             System.out.println(msgs[i].getSubject());
-//                            System.out.println("内容" + ((MimeMessage)msgs[i]).getContent().toString());
 
-                            String replyTo = InternetAddress.toString(msgs[i].getReplyTo());
-                            System.out.println("发件人"  + replyTo);
-                            String to = InternetAddress.toString(msgs[i].getRecipients(Message.RecipientType.TO));
-                            System.out.println("地址" + to);
-
-                            Date sentDate = msgs[i].getSentDate();
-                            System.out.println("发送日期" + sentDate);
                             Date receDate = msgs[i].getReceivedDate();
                             System.out.println("接收日期" + receDate) ;
 
-                            Date date = new Date();
-                            System.out.println("响应时间" + date.getTime());
-                            System.out.println("延迟时间" + (date.getTime() - receDate.getTime()));
+                            Date date1 = new Date();
+                            System.out.println("响应时间" + date1.getTime());
+                            System.out.println("延迟时间" + (date1.getTime() - receDate.getTime()));
                             if ("测试主题".equals(msgs[i].getSubject())){
+                                if (date1.getTime() - date.getTime() > timeSpace) {
+                                    date = date1;
+                                    System.out.println("时间更新" + date);
+                                    System.out.println("拨打一次电话");
+                                }
 //                                int code = yunpianPhone();
                             }
                         } catch (Exception ex) {
@@ -110,9 +107,18 @@ public class MailToPhoneServiceImpl implements MailToPhoneService {
                         }
                     }
                 }
+                @Override
+                public void messagesRemoved(MessageCountEvent e) {
+                }
             });
 
+
+            boolean isOpenidle = true;
+            // 睡眠时间
+            String freqs = "5000";
             // 检查是否支持imap idle,尝试使用idle
+
+
             int freq = Integer.parseInt(freqs);
             boolean supportsIdle = false;
             try {
@@ -128,13 +134,12 @@ public class MailToPhoneServiceImpl implements MailToPhoneService {
             }
             for (; ; ) {
                 if (supportsIdle && folder instanceof IMAPFolder) {
+                    System.out.println("##################持续监听新邮件###################");
                     IMAPFolder f = (IMAPFolder) folder;
                     f.idle();
-                    System.out.println("##################持续监听新邮件###################");
                 } else {
                     System.out.println("idle不支持进入轮询");
                     Thread.sleep(freq); // sleep for freq milliseconds
-
                     // 注意。getMessageCount时会触发监听器
                     folder.getMessageCount();
                 }
@@ -146,48 +151,6 @@ public class MailToPhoneServiceImpl implements MailToPhoneService {
 
     }
 
-    public int yunpianPhone(){
-
-        String host = "https://voice.yunpian.com";
-        String path = "/v2/voice/send.json";
-        String method = "POST";
-        String apikey = "4c84252c6be90ed0e28e17f27d8a962f";
-        String code = "123456";
-        String phone = "17634966141";
-
-        Map<String, String> headers = new HashMap<String, String>();
-        //最后在header中的格式(中间是英文空格)为Authorization:APPCODE 83359fd73fe94948385f570e3c139105
-//        headers.put("Authorization", "APPCODE " + appcode);
-
-
-        Map<String, String> querys = new HashMap<String, String>();
-        querys.put("apikey", apikey);
-        querys.put("code", code);
-        querys.put("mobile", phone);
-
-        Map<String, String> bodys = new HashMap<String, String>();
-
-        try {
-            /**
-             * 重要提示如下:
-             * HttpUtils请从
-             * https://github.com/aliyun/api-gateway-demo-sign-java/blob/master/src/main/java/com/aliyun/api/gateway/demo/util/HttpUtils.java
-             * 下载
-             *
-             * 相应的依赖请参照
-             * https://github.com/aliyun/api-gateway-demo-sign-java/blob/master/pom.xml
-             */
-            HttpResponse response = HttpUtils.doPost(host, path, method, headers, querys, bodys);
-            System.out.println(response.toString());
-            //获取response的body
-            System.out.println(EntityUtils.toString(response.getEntity()));
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        return 1;
-
-    }
 
 
 

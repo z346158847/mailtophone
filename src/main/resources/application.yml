@@ -1,6 +1,10 @@
-
 server:
-  port: 8081
+  port: 8082
 
 
 
+woconnect:
+  username: wjzhang@woconnect.cn
+  password: Zwj1996@
+  phone: 17634966141
+  warning: '预警消息'
