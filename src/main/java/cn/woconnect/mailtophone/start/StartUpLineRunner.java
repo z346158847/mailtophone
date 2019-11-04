@@ -20,7 +20,6 @@ public class StartUpLineRunner implements CommandLineRunner {
     @Override
     public void run(String... args) throws Exception {
         System.out.println("################开始连接邮箱服务器#################");
-
         mailToPhoneService.resceiveMailToPhoneVoice();
 
     }
