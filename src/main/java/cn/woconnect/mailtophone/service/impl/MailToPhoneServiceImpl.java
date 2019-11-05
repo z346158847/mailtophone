@@ -34,21 +34,19 @@ public class MailToPhoneServiceImpl implements MailToPhoneService {
         String password = "rfufgihobsumcafj";
         // host  和  端口
         String host = "imap.qq.com";
-        int port = 993;
-
-
-
+        Integer port = 993;
 
         final String SSL_FACTORY = "javax.net.ssl.SSLSocketFactory";
         Security.addProvider(new com.sun.net.ssl.internal.ssl.Provider());
+        // 构建属性
         Properties props = System.getProperties();
         // imap
         props.setProperty("mail.store.protocol","imap");
         props.setProperty("mail.imap.host", host);
-        props.setProperty("mail.imap.port", "993");
+        props.setProperty("mail.imap.port", port.toString());
 
         //ssl
-        props.setProperty("mail.imap.socketFactory.port","993");
+        props.setProperty("mail.imap.socketFactory.port", port.toString());
         props.setProperty("mail.imap.auth.login.disable", "true");
         props.setProperty("mail.imap.socketFactory.class", SSL_FACTORY);
 
@@ -63,13 +61,13 @@ public class MailToPhoneServiceImpl implements MailToPhoneService {
             store.connect(host,port,username,password);
             folder=(IMAPFolder)store.getFolder("INBOX"); //收件箱
             // 全部文件夹
-//            Folder defaultFolder = store.getDefaultFolder();
-//            Folder[] allFolder = defaultFolder.list();
+            Folder defaultFolder = store.getDefaultFolder();
+            Folder[] allFolder = defaultFolder.list();
 
             System.out.println("################连接邮箱服务器成功#################");
-//            for (int i = 0; i < allFolder.length; i++) {
-//                System.out.println("这个是服务器中的文件夹="+allFolder[i].getFullName());
-//            }
+            for (int i = 0; i < allFolder.length; i++) {
+                System.out.println("这个是服务器中的文件夹="+allFolder[i].getFullName());
+            }
             // 使用只读方式打开收件箱
             folder.open(Folder.READ_ONLY);
             System.out.println("##################开始监听新邮件###################");
@@ -117,7 +115,6 @@ public class MailToPhoneServiceImpl implements MailToPhoneService {
             // 睡眠时间
             String freqs = "5000";
             // 检查是否支持imap idle,尝试使用idle
-
 
             int freq = Integer.parseInt(freqs);
             boolean supportsIdle = false;
