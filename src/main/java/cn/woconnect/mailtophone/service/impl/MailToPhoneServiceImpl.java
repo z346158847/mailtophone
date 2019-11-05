@@ -17,6 +17,7 @@ import java.util.*;
 
 /**
  * 接收邮件电话通知
+ *
  * @author wjzhang
  * @date 2019/11/1  18:30
  */
@@ -27,6 +28,12 @@ public class MailToPhoneServiceImpl implements MailToPhoneService {
 
     private long timeSpace = 30 * 1000L;
 
+    /**
+     * 利用javamail的监听器去监听是否收到新邮件
+     * 但有bug 连续收到两封邮件（间隔大概小于20s）
+     * 会延迟  最长可能10分钟
+     * 最后还是采用轮询方式
+     */
     @Override
     public void resceiveMailToPhoneVoice() {
         // 收件人邮箱  和  授权码
@@ -41,7 +48,7 @@ public class MailToPhoneServiceImpl implements MailToPhoneService {
         // 构建属性
         Properties props = System.getProperties();
         // imap
-        props.setProperty("mail.store.protocol","imap");
+        props.setProperty("mail.store.protocol", "imap");
         props.setProperty("mail.imap.host", host);
         props.setProperty("mail.imap.port", port.toString());
 
@@ -50,28 +57,30 @@ public class MailToPhoneServiceImpl implements MailToPhoneService {
         props.setProperty("mail.imap.auth.login.disable", "true");
         props.setProperty("mail.imap.socketFactory.class", SSL_FACTORY);
 
-        Session session = Session.getDefaultInstance(props,null);
+        Session session = Session.getDefaultInstance(props, null);
         session.setDebug(false);
-        IMAPFolder folder= null;
-        IMAPStore store=null;
+        IMAPFolder folder = null;
+        IMAPStore store = null;
 
         try {
             //得到邮件仓库并连接
-            store=(IMAPStore)session.getStore("imap");  // 使用imap会话机制，连接服务器
-            store.connect(host,port,username,password);
-            folder=(IMAPFolder)store.getFolder("INBOX"); //收件箱
+            store = (IMAPStore) session.getStore("imap");  // 使用imap会话机制，连接服务器
+            store.connect(host, port, username, password);
+            folder = (IMAPFolder) store.getFolder("INBOX"); //收件箱
             // 全部文件夹
             Folder defaultFolder = store.getDefaultFolder();
             Folder[] allFolder = defaultFolder.list();
 
             System.out.println("################连接邮箱服务器成功#################");
             for (int i = 0; i < allFolder.length; i++) {
-                System.out.println("这个是服务器中的文件夹="+allFolder[i].getFullName());
+                System.out.println("这个是服务器中的文件夹=" + allFolder[i].getFullName());
             }
-            // 使用只读方式打开收件箱
-            folder.open(Folder.READ_ONLY);
+            // 使用读写方式打开收件箱
+            folder.open(Folder.READ_WRITE);
             System.out.println("##################开始监听新邮件###################");
-            // 监听message变化
+
+
+            // 监听邮件新增和删除变化
             folder.addMessageCountListener(new MessageCountListener() {
                 @Override
                 public void messagesAdded(MessageCountEvent e) {
@@ -87,12 +96,14 @@ public class MailToPhoneServiceImpl implements MailToPhoneService {
                             System.out.println(msgs[i].getSubject());
 
                             Date receDate = msgs[i].getReceivedDate();
-                            System.out.println("接收日期" + receDate) ;
+                            System.out.println("接收日期" + receDate);
 
                             Date date1 = new Date();
                             System.out.println("响应时间" + date1.getTime());
                             System.out.println("延迟时间" + (date1.getTime() - receDate.getTime()));
-                            if ("测试主题".equals(msgs[i].getSubject())){
+
+                            // 过滤主题
+                            if ("测试主题".equals(msgs[i].getSubject())) {
                                 if (date1.getTime() - date.getTime() > timeSpace) {
                                     date = date1;
                                     System.out.println("时间更新" + date);
@@ -105,17 +116,19 @@ public class MailToPhoneServiceImpl implements MailToPhoneService {
                         }
                     }
                 }
+
                 @Override
                 public void messagesRemoved(MessageCountEvent e) {
                 }
             });
 
 
+            // imap监听
             boolean isOpenidle = true;
             // 睡眠时间
             String freqs = "5000";
-            // 检查是否支持imap idle,尝试使用idle
 
+            // 检查是否支持imap idle,尝试使用idle
             int freq = Integer.parseInt(freqs);
             boolean supportsIdle = false;
             try {
@@ -145,14 +158,5 @@ public class MailToPhoneServiceImpl implements MailToPhoneService {
         } catch (Exception ex) {
             ex.printStackTrace();
         }
-
     }
-
-
-
-
-
-
-
-
 }

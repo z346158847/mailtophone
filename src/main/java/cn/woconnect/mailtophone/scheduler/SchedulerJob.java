@@ -10,24 +10,38 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import javax.mail.*;
+import javax.mail.search.FlagTerm;
 import java.security.Security;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
 /**
+ * 轮询接收邮件
+ *
  * @author wjzhang
  * @date 2019/11/4  15:56
  */
 @Component
 public class SchedulerJob {
-
+    /**
+     * 告警消息
+     */
     @Value("${woconnect.warning}")
     private String warning;
+    /**
+     * 通知电话
+     */
     @Value("${woconnect.phone}")
     private String phone;
+    /**
+     * 邮箱名
+     */
     @Value("${woconnect.username}")
     private String username;
+    /**
+     * 邮箱授权码  ali企业邮箱为密码
+     */
     @Value("${woconnect.password}")
     private String password;
 
@@ -37,47 +51,61 @@ public class SchedulerJob {
         String host = "imap.mxhichina.com";
         String port = "993";
 
-        final String SSL_FACTORY = "javax.net.ssl.SSLSocketFactory";
-        Security.addProvider(new com.sun.net.ssl.internal.ssl.Provider());
+        // 配置连接邮箱所需参数
         Properties props = System.getProperties();
         // imap
         props.setProperty("mail.store.protocol", "imap");
         props.setProperty("mail.imap.host", host);
         props.setProperty("mail.imap.port", port);
 
-        //ssl
+        //ssl连接  linux中一般需要ssl
+        final String SSL_FACTORY = "javax.net.ssl.SSLSocketFactory";
+        Security.addProvider(new com.sun.net.ssl.internal.ssl.Provider());
         props.setProperty("mail.imap.socketFactory.port", port);
         props.setProperty("mail.imap.auth.login.disable", "true");
         props.setProperty("mail.imap.socketFactory.class", SSL_FACTORY);
         props.setProperty("mail.imap.socketFactory.fallback", "false");
 
         Session session = Session.getInstance(props);
-
-        IMAPStore store = (IMAPStore) session.getStore("imap"); // 使用imap会话机制，连接服务器
+        // 使用imap会话机制，连接服务器
+        IMAPStore store = (IMAPStore) session.getStore("imap");
+        // 建立连接
         store.connect(username, password);
-        IMAPFolder folder = (IMAPFolder) store.getFolder("INBOX"); // 收件箱
+        // 收件箱
+        IMAPFolder folder = (IMAPFolder) store.getFolder("INBOX");
+        // 设置为读和写
         folder.open(Folder.READ_WRITE);
         // 获取总邮件数
-//        total = folder.getMessageCount();
+        folder.getMessageCount();
 
+        FlagTerm ft = new FlagTerm(new Flags(Flags.Flag.SEEN), false);
+        /**
+         * Flag 类型列举如下
+         * Flags.Flag.ANSWERED 邮件回复标记，标识邮件是否已回复。
+         * Flags.Flag.DELETED 邮件删除标记，标识邮件是否需要删除。
+         * Flags.Flag.DRAFT 草稿邮件标记，标识邮件是否为草稿。
+         * Flags.Flag.FLAGGED 表示邮件是否为回收站中的邮件。
+         * Flags.Flag.RECENT 新邮件标记，表示邮件是否为新邮件。
+         * Flags.Flag.SEEN 邮件阅读标记，标识邮件是否已被阅读。
+         * Flags.Flag.USER 底层系统是否支持用户自定义标记，只读。
+         */
         // 得到收件箱文件夹信息，获取邮件列表
 //        System.out.println("未读邮件数：" + folder.getUnreadMessageCount());
-        Message[] messages = folder.getMessages();
-        int messageNumber = 0;
-        for (Message message : messages) {
-            Flags flags = message.getFlags();
-            if (flags.contains(Flags.Flag.SEEN)) {
-//                    System.out.println("这是一封已读邮件");
-            } else {
 
-                if (warning.equals(message.getSubject())) {
-                    System.out.println("###################发现预警消息##################");
-                    System.out.println("###################开始拨打电话##################");
-                    yunpianPhone();
-                    message.setFlag(Flags.Flag.SEEN, true);
-                    System.out.println("#################将邮件修改为已读#################");
-                    System.out.println("###################拨打电话完成##################");
-                }
+        //全部邮件
+//        Message[] messages = folder.getMessages();
+
+        // 根据设置好的条件获取message
+        Message[] messages = folder.search(ft);
+        for (Message message : messages) {
+            // 过滤所需预警标题
+            if (warning.equals(message.getSubject())) {
+                System.out.println("###################发现预警消息##################");
+                System.out.println("###################开始拨打电话##################");
+                yunpianPhone();
+                message.setFlag(Flags.Flag.SEEN, true);
+                System.out.println("#################将邮件修改为已读#################");
+                System.out.println("###################拨打电话完成##################");
             }
 
         }
@@ -86,14 +114,12 @@ public class SchedulerJob {
             folder.close(true);
         if (store != null)
             store.close();
-
-
     }
 
     /**
      * 云片拨打电话接口
      */
-    public void yunpianPhone(){
+    public void yunpianPhone() {
 
         String host = "https://voice.yunpian.com";
         String path = "/v2/voice/send.json";
@@ -133,10 +159,6 @@ public class SchedulerJob {
             e.printStackTrace();
         }
     }
-
-
-
-
 
 
 }
